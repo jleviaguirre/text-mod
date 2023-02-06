@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright © 2020. TIBCO Software Inc.
  * This file is subject to the license terms contained
  * in the license file that is distributed with this file.
@@ -13,7 +13,6 @@
 var lastMarkedIndex = 0;
 Spotfire.initialize(async (mod) => {
     var prevIndex = 0;
-    var prevCardBy = "(Row Number)";
 
     // create the read function
     const reader = mod.createReader(
@@ -21,8 +20,11 @@ Spotfire.initialize(async (mod) => {
         mod.windowSize(),
         mod.visualization.axis("Content"),
         mod.visualization.axis("Sorting"),
+        mod.property("sortOrder"),
         mod.visualization.axis("Card by"),
-        mod.property("sortOrder")
+        mod.property("useCustomCardBy"),
+        mod.visualization.axis("Tooltip"),
+        mod.visualization.axis("Annotation")
     );
 
     const modDiv = findElem("#text-card-container");
@@ -30,56 +32,49 @@ Spotfire.initialize(async (mod) => {
     // store the context
     const context = mod.getRenderContext();
 
-    // used to set max number of cards to equal the number of rows of dataset
-    mod.visualization.axis("Card by").setExpression("<baserowid()>");
-
     // initiate the read loop
     reader.subscribe(render);
 
     /**
      * @param {Spotfire.DataView} dataView
      * @param {Spotfire.Size} windowSize
-     * @param {Spotfire.Axis} contentProp
-     * @param {Spotfire.Axis} sortingProp
+     * @param {Spotfire.Axis} contentAxis
+     * @param {Spotfire.Axis} sortAxis
+     * @param {Spotfire.ModProperty<string>} sortOrder
+     * @param {Spotfire.Axis} cardByAxis
+     * @param {Spotfire.ModProperty<string>} sortOrder
+     * @param {Spotfire.Axis} tooltipAxis
+     * @param {Spotfire.Axis} annotationAxis
      */
     // @ts-ignore
-    async function render(dataView, windowSize, contentProp, sortingProp, cardbyProp, sortOrder) {
+    async function render(dataView, windowSize, contentAxis, sortAxis, sortOrder, cardByAxis, useCustomCardBy, tooltipAxis, annotationAxis) {
+        // Check card by axis expression.
+        if (cardByAxis.expression !== "<baserowid()>" && !useCustomCardBy.value()) {
+            createWarning(modDiv, context.styling.general.font.color, cardByAxis, useCustomCardBy);
+            mod.controls.errorOverlay.hide();
+            return;
+        } else {
+            clearWarning(modDiv);
+        }
+
         /**
          * Check data axes
          * - Check if content empty
          * - Check if content is multiple
-         * - Check if sorting is multiple
-         * - Check if card by is empy
          */
 
-        if (contentProp.parts.length == 0) {
+        if (contentAxis.parts.length == 0) {
             mod.controls.errorOverlay.show("Select the 'Content' of the text cards to get started!");
             return;
-        } else if (cardbyProp.parts.length == 0) {
-            mod.controls.errorOverlay.show(
-                "Select a column in 'Card by' to get started! Default value (for non-aggregated data): (Row Number)"
-            );
-            return;
-        } else if (contentProp.parts.length > 1 || sortingProp.parts.length > 1) {
-            if (contentProp.parts.length > 1)
+        } else if (contentAxis.parts.length > 1) {
+            if (contentAxis.parts.length > 1) {
                 mod.controls.errorOverlay.show("Selecting multiple columns in 'Content' is not supported.");
-            else if (sortingProp.parts.length > 1) {
-                mod.controls.errorOverlay.show("Selecting multiple columns in 'Sorting' is not supported.");
             } else {
                 mod.controls.errorOverlay.show("Something went wrong. Please reload the mod.");
             }
             return;
         }
         mod.controls.errorOverlay.hide();
-
-        if (cardbyProp.parts[0].displayName !== "(Row Number)") {
-            if (cardbyProp.parts[0].displayName !== prevCardBy) {
-                createWarning(modDiv, context.styling.general.font.color, cardbyProp);
-                prevCardBy = cardbyProp.parts[0].displayName;
-            }
-        } else {
-            prevCardBy = "(Row Number)";
-        }
 
         // non-global value
         const cardsToLoad = 100;
@@ -100,44 +95,38 @@ Spotfire.initialize(async (mod) => {
 
         // get rows/data from dataview via api
         var rows = await dataView.allRows();
+        let ha = await dataView.hierarchy("Annotation");
+        let ht = await dataView.hierarchy("Tooltip");
+        let hierarchy = {
+            annotation: ha,
+            tooltip: ht
+        };
 
         if (rows == null) {
             // User interaction caused the data view to expire.
             // Don't clear the mod content here to avoid flickering.
             return;
         }
+
         // Checks if there is content to display
         let contentToDisplay = false;
         for (let i = 0; i < rows.length; i++) {
-            if (getDataValue(rows[i], "Content", 0) !== null) {
+            if (rows[i].categorical("Content").value()[0].key !== null) {
                 contentToDisplay = true;
             }
         }
-        // Dsiplay error if there is no content to display
+
+        // Display error if there is no content to display
         if (!contentToDisplay) {
             mod.controls.errorOverlay.show("No available text cards.");
         }
 
         // check if sorting is enabled
-        let sortingEnabled = false;
-        if ((await dataView.categoricalAxis("Sorting")) != null) {
+        let sortingEnabled = sortAxis.expression != "" && sortAxis.expression != "<>";
+        if (sortingEnabled) {
             // create sort button only if there is a value selected in sorting axis
-            sortingEnabled = true;
-            if (sortOrder.value() != "unordered") {
-                sortRows(rows, sortOrder.value());
-            }
-        } else {
-            //set back default value
-            sortOrder.set("asc");
-        }
-
-        // check if tooltip is enabled
-        var tooltip = false;
-        if ((await dataView.categoricalAxis("Tooltip")) != null) tooltip = true;
-
-        // check if annotation is enabled
-        var annotationEnabled = false;
-        if ((await dataView.categoricalAxis("Annotation")) != null) annotationEnabled = true;
+            sortRows(rows, sortOrder.value(), sortAxis.isCategorical);
+        } 
 
         var rerender = true;
 
@@ -148,9 +137,7 @@ Spotfire.initialize(async (mod) => {
             rerender,
             windowSize,
             mod,
-            tooltip,
-            annotationEnabled,
-            dataView
+            hierarchy
         );
         // @ts-ignore
         modDiv.appendChild(returnedObject.fragment);
@@ -200,9 +187,7 @@ Spotfire.initialize(async (mod) => {
                     rerender,
                     windowSize,
                     mod,
-                    tooltip,
-                    annotationEnabled,
-                    dataView
+                    hierarchy
                 );
                 // @ts-ignore
                 modDiv.appendChild(returnedObject.fragment);

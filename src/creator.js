@@ -1,12 +1,17 @@
+//@ts-check - Get type warnings from the TypeScript language server. Remove if not wanted.
+
 /**
  * Create a text card.
- * @param content Content inside the div
- * @param annotation Annotation data from axis chosen by the user
- * @param windowSize Windowsize of the mod
- * @param markObject MarkObject contains information about if the object and/or rows is marked
- * @returns {HTMLDocument}
+ * @param {string} content Content inside the div
+ * @param {Spotfire.DataViewCategoricalValuePathElement[]} annotation Annotation data from axis chosen by the user
+ * @param {number} maxHeight Max height of card
+ * @param {{row:boolean, allRows:boolean}} markObject MarkObject contains information about if the object and/or rows is marked
+ * @param {StylingInfo} fontStyling
+ * @returns {{ textCardDiv: HTMLDivElement,
+        header: HTMLDivElement,
+        content: HTMLDivElement}}
  */
-function createTextCard(content, annotation, windowSize, markObject, fontStyling, lineDividerColor) {
+function createTextCard(content, annotation, maxHeight, markObject, fontStyling, lineDividerColor) {
     // create div
     var textCardDiv = createTextCardDiv(fontStyling);
 
@@ -19,8 +24,7 @@ function createTextCard(content, annotation, windowSize, markObject, fontStyling
         var header = createTextCardHeader();
 
         var firstAnnotationCreated = false;
-        var annotationLength = annotation[0]._node.__hierarchy.levels.length;
-        for (var i = 0; i < annotationLength; i++) {
+        for (var i = 0; i < annotation.length; i++) {
             var dataValue = annotation[i].formattedValue(); // get annotation value
 
             if (annotation[i].key !== null) {
@@ -58,7 +62,7 @@ function createTextCard(content, annotation, windowSize, markObject, fontStyling
 
     // add paragraph to text card
     if (typeof content === "string") {
-        var contentParagraph = createTextCardContentParagraph(windowSize, content, fontStyling);
+        var contentParagraph = createTextCardContentParagraph(maxHeight, content, fontStyling);
         textCardDiv.appendChild(contentParagraph);
     }
 
@@ -73,18 +77,18 @@ function createTextCard(content, annotation, windowSize, markObject, fontStyling
 
 /**
  * Create a tooltip string
- * @param specificRow Row of dataset
- * @param tooltipContent Content of tooltip
- * @returns {String}
+ * @param {Spotfire.DataViewRow} specificRow Row of dataset
+ * @param {Spotfire.DataViewHierarchy} tooltipHierarchy Content of tooltip
+ * @returns {string}
  */
-function createTooltipString(specificRow, tooltipContent) {
-    var nrOfTooltipChoices = specificRow.categorical(tooltipContent).value()[0]._node.__hierarchy.levels.length;
+function createTooltipString(specificRow, tooltipHierarchy) {
+    var nrOfTooltipChoices = specificRow.categorical(tooltipHierarchy.name).value().length;
     var tooltipCollection = [];
     var tooltipString = "";
     var i = null;
     for (i = 0; i < nrOfTooltipChoices; i++) {
-        var columnName = getColumnName(specificRow, tooltipContent, i);
-        var dataValue = specificRow.categorical(tooltipContent).value()[i].formattedValue();
+        var columnName = tooltipHierarchy.levels[i].name;
+        var dataValue = specificRow.categorical(tooltipHierarchy.name).value()[i].formattedValue();
 
         // truncate to a max length of 100 characters per tooltip row
         var maxLength = 100;
@@ -108,27 +112,29 @@ function createTooltipString(specificRow, tooltipContent) {
 
 /**
  * Create a text card content paragraph
- * @param windowSize Size of mod
- * @param content Content of text card
- * @param fontStyling Style of font from api
- * @returns {String}
+ * @param {number} maxHeight Max height of card
+ * @param {string} content Content of text card
+ * @param {StylingInfo} fontStyling Style of font from api
+ * @returns {HTMLDivElement}
  */
-function createTextCardContentParagraph(windowSize, content, fontStyling) {
+function createTextCardContentParagraph(maxHeight, content, fontStyling) {
     var paragraph = document.createElement("div");
     paragraph.setAttribute("id", "text-card-paragraph");
-    paragraph.textContent = content;
-    paragraph.style.maxHeight = windowSize.height * 0.5 + "px";
+    paragraph.innerHTML = content;
+    paragraph.style.maxHeight = maxHeight + "px";
+
     // apply styling of font Weight and Style only on Textcard Content (not on annotation line)
     paragraph.style.fontStyle = fontStyling.fontStyle;
     paragraph.style.fontWeight = fontStyling.fontWeight;
+    paragraph.style.whiteSpace = "pre-line";
 
     return paragraph;
 }
 
 /**
  * Create header of text card / annotation
- * @param annotation Annotation content
- * @returns {String}
+ * @param {string} annotation Annotation content
+ * @returns {HTMLDivElement}
  */
 function createHeaderContent(annotation) {
     var headerContent = document.createElement("div");
@@ -139,8 +145,8 @@ function createHeaderContent(annotation) {
 
 /**
  * Create line divider in text card
- * @param lineColor Color of line divider
- * @returns {HTMLDocument}
+ * @param {string} lineColor Color of line divider
+ * @returns {HTMLHRElement}
  */
 function createLineDividerInTextCard(lineColor) {
     var line = document.createElement("hr");
@@ -152,8 +158,8 @@ function createLineDividerInTextCard(lineColor) {
 
 /**
  * Create text card div
- * @param fontStyling Style of the current mod from api
- * @returns {HTMLDocument}
+ * @param {StylingInfo} fontStyling Style of the current mod from api
+ * @returns {HTMLDivElement}
  */
 function createTextCardDiv(fontStyling) {
     var textCardDiv = document.createElement("div");
@@ -166,7 +172,7 @@ function createTextCardDiv(fontStyling) {
 
 /**
  * Create text card header string
- * @returns {String}
+ * @returns {HTMLDivElement}
  */
 function createTextCardHeader() {
     var header = document.createElement("div");
@@ -176,8 +182,8 @@ function createTextCardHeader() {
 
 /**
  * Create copy button for the text card
- * @param newDiv The div / text card to have the new button
- * @param buttonColor Color of button
+ * @param {HTMLDivElement} newDiv The div / text card to have the new button
+ * @param {string} buttonColor Color of button
  */
 function createCopyButton(newDiv, buttonColor) {
     // create element
@@ -224,11 +230,12 @@ function createCopyButton(newDiv, buttonColor) {
 
 /**
  * Create a Spotfire-style warning when "Cards by" gets changed from default value.
- * @param mod The mod to change "Cards by" to default
- * @param warningDiv The div / text card to have the new button
- * @param textColor textColor
+ * @param {HTMLElement} modDiv The div / text card to have the new button
+ * @param {string} textColor
+ * @param {Spotfire.Axis} cardbyProp
+ * @param {Spotfire.ModProperty<boolean>} customExpression
  */
-function createWarning(modDiv, textColor, cardbyProp) {
+function createWarning(modDiv, textColor, cardbyProp, customExpression) {
     // get warning div
     var warningDiv = findElem("#warning-message");
 
@@ -245,48 +252,49 @@ function createWarning(modDiv, textColor, cardbyProp) {
 
     var errorText = document.createElement("div");
     errorText.setAttribute("class", "error-text");
-    errorText.style.fontColor = textColor;
-    errorText.textContent = "The Text Card Mod is made to show unaggregated data.\r\n";
-    errorText.textContent += "Not selecting (Row Number) might lead to unwanted behavior.";
+    errorText.style.color = textColor;
+    errorText.innerHTML =
+        "This visualization is made to show unaggregated data.<br>Not selecting <strong>(Row Number)</strong> may display aggregated text cards.";
     errorContainer.appendChild(errorText);
 
     var buttonRow = document.createElement("div");
     buttonRow.setAttribute("class", "warning-row");
 
-    // create 'Ignore' button
     var ignoreButton = document.createElement("div");
-    ignoreButton.setAttribute("class", "spotfire-button-flex spotfire-button-white");
-    var ignoreButtonText = document.createElement("div");
-    ignoreButtonText.setAttribute("class", "spotfire-button-text");
-    ignoreButtonText.textContent = "Ignore";
-    ignoreButton.onclick = (e) => {
-        // hide warning and show text cards
-        warningDiv.style.display = "none";
-        modDiv.style.display = "block";
-        e.stopPropagation();
-    };
-    ignoreButton.appendChild(ignoreButtonText);
-    buttonRow.appendChild(ignoreButton);
+    var resetButton = document.createElement("div");
 
-    var buttonSpace = document.createElement("div");
-    buttonSpace.setAttribute("class", "spotfire-button-spacer");
-    buttonRow.appendChild(buttonSpace);
+    const disableUI = function () {
+        ignoreButton.onclick = null;
+        resetButton.onclick = null;
+        errorContainer.style.opacity = "0.5";
+    };
+
+    // create 'Ignore' button
+    if (cardbyProp.expression !== "<>" && cardbyProp.expression !== "<baserowid()>") {
+        ignoreButton.setAttribute("class", "spotfire-button-flex spotfire-button-white");
+        var ignoreButtonText = document.createElement("div");
+        ignoreButtonText.setAttribute("class", "spotfire-button-text");
+        ignoreButtonText.textContent = "Keep current setting";
+        ignoreButton.onclick = (e) => {
+            // Allow future custom expressions
+            customExpression.set(true);
+            disableUI();
+            e.stopPropagation();
+        };
+        ignoreButton.appendChild(ignoreButtonText);
+        buttonRow.appendChild(ignoreButton);
+    }
 
     // create 'Reset' button
-    var resetButton = document.createElement("div");
     resetButton.setAttribute("class", "spotfire-button-flex spotfire-button-blue");
     var resetButtonText = document.createElement("div");
     resetButtonText.setAttribute("class", "spotfire-button-text");
-    resetButtonText.textContent = "Reset";
+    resetButtonText.textContent = "Use '(Row Number)'";
     resetButton.onclick = (e) => {
-        // setexp to baserow
+        // Change Card By expression to baserowid
         cardbyProp.setExpression("<baserowid()>");
-        setTimeout(() => {
-            // hide warning and show text cards
-            warningDiv.style.display = "none";
-            modDiv.style.display = "block";
-        }, 1000);
-
+        customExpression.set(false);
+        disableUI();
         e.stopPropagation();
     };
 
@@ -299,9 +307,21 @@ function createWarning(modDiv, textColor, cardbyProp) {
 }
 
 /**
+ * Clear the "Cards by" warning
+ * @param {*} modDiv
+ */
+function clearWarning(modDiv) {
+    // get warning div
+    var warningDiv = findElem("#warning-message");
+    warningDiv.style.display = "none";
+    modDiv.style.display = "block";
+}
+
+/**
  * Create copy button for the text card
- * @param newDiv The div / text card to have the new button
- * @param buttonColor Color of button
+ * @param {HTMLElement} newDiv The div / text card to have the new button
+ * @param {string} buttonColor Color of button
+ * @param {Spotfire.ModProperty<string>} sortOrder
  */
 function createSortButton(newDiv, buttonColor, sortOrder) {
     // create element

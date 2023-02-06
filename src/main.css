@@ -113,6 +113,7 @@ body {
 
 .error-container {
     position: absolute;
+    width: 100%;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
@@ -121,7 +122,6 @@ body {
 .error-text {
     margin: auto;
     padding: 8px;
-    white-space: pre;
 }
 
 .warning-row {
@@ -136,9 +136,6 @@ body {
     justify-content: center;
 }
 
-.spotfire-button-spacer {
-    width: 16px;
-}
 .spotfire-button-blue {
     background-color: #7289f9;
     color: #ffffff;
@@ -181,6 +178,7 @@ body {
     padding-left: 16px;
     padding-right: 16px;
     box-sizing: border-box;
+    margin: 4px 8px;
 }
 
 .spotfire-button-text {

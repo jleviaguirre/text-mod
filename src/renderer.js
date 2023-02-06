@@ -1,24 +1,32 @@
+//@ts-check
+/**
+ * @typedef {Object} StylingInfo
+ * @property {string} fontColor
+ * @property {string} fontSize
+ * @property {string} fontFamily
+ * @property {string} fontStyle
+ * @property {string} fontWeight
+ */
+
+/**
+ * @typedef {Object} CardDiv
+ * @property {HTMLDivElement} textCardDiv
+ * @property {HTMLDivElement} content
+ * @property {HTMLDivElement} header
+ */
+
 /**
  * Render Text Cards
- * @param {*} rows All the rows from the dataset
- * @param {*} prevIndex Index of the previously rendered text card
- * @param {*} cardsToLoad Number of cards to render at one time
- * @param {*} rerender Boolean to check if the text cards needs to be rerendered
- * @param {*} windowSize WindowSize of the mod in pixels
- * @param {*} mod The mod object that will be used to add a tooltip using the "controls"
- * @returns {HTMLDocument}
+ * @param {Spotfire.DataViewRow[]} rows All the rows from the dataset
+ * @param {number} prevIndex Index of the previously rendered text card
+ * @param {number} cardsToLoad Number of cards to render at one time
+ * @param {boolean} rerender Boolean to check if the text cards needs to be rerendered
+ * @param {Spotfire.Size} windowSize WindowSize of the mod in pixels
+ * @param {Spotfire.Mod} mod The mod object that will be used to add a tooltip using the "controls"
+ * @param {{tooltip: Spotfire.DataViewHierarchy, annotation: Spotfire.DataViewHierarchy  }} hierarchy
+ * @returns {{fragment: DocumentFragment, startIndex: number}}
  */
-function renderTextCards(
-    rows,
-    prevIndex,
-    cardsToLoad,
-    rerender,
-    windowSize,
-    mod,
-    tooltipEnabled,
-    annotationEnabled,
-    dataView
-) {
+function renderTextCards(rows, prevIndex, cardsToLoad, rerender, windowSize, mod, hierarchy) {
     if (rerender) {
         document.querySelector("#text-card-container").innerHTML = "";
     }
@@ -38,11 +46,11 @@ function renderTextCards(
     const styling = mod.getRenderContext().styling;
     // general fonts styling
     const fontStyling = {
-        fontSize: styling.general.font.fontSize,
+        fontSize: styling.general.font.fontSize.toString(),
         fontFamily: styling.general.font.fontFamily,
         fontColor: styling.general.font.color,
-        fontStyle: styling.general.fontStyle,
-        fontWeight: styling.general.fontWeight
+        fontStyle: styling.general.font.fontStyle,
+        fontWeight: styling.general.font.fontWeight
     };
     // additional styling for scales
     const scalesStyling = {
@@ -82,10 +90,10 @@ function renderTextCards(
         let textCardContent = rows[index].categorical("Content").formattedValue();
 
         // textCard not NULL or UNDEFINED
-        if (getDataValue(rows[index], "Content", 0)) {
+        if (rows[index].categorical("Content").value()[0].key) {
             // create annotation
             var annotation = null;
-            if (annotationEnabled) {
+            if (!hierarchy.annotation.isEmpty) {
                 annotation = rows[index].categorical("Annotation").value();
             }
 
@@ -102,11 +110,15 @@ function renderTextCards(
             let borderDiv = document.createElement("div");
             borderDiv.setAttribute("id", "text-card-border");
 
+            // Allow single card to fill full height.
+            let paddingHeight = annotation ? 80 : 50;
+            let cardMaxHeight = rows.length == 1 ? windowSize.height - paddingHeight : windowSize.height / 2;
+
             // create the text card
             let divObject = createTextCard(
                 textCardContent,
                 annotation,
-                windowSize,
+                cardMaxHeight,
                 markObject,
                 fontStyling,
                 scalesStyling.tickMarkColor
@@ -125,61 +137,33 @@ function renderTextCards(
                 var scrolling = true;
                 let width = newDiv.getBoundingClientRect().width + 27;
                 let height = newDiv.getBoundingClientRect().height;
-                let maxHeight = windowSize.height * 0.5;
 
                 // check if card could have scrollbar and check if clicking scrollbar
-                if (height < maxHeight || width - event.clientX > 10) {
+                if (height < cardMaxHeight || width - event.clientX > 10) {
                     scrolling = false;
                 }
                 newDiv.onmouseup = function () {
                     if (!scrolling) {
+                        /**
+                         * Use standard marking operation according to ctrl key state
+                         * Mark all rows in sequence as the API will enqueue them all and send as one modify
+                         *  @type { Spotfire.MarkingOperation }  */
+                        let operation = event.ctrlKey ? "ToggleOrAdd" : "Replace";
                         if (!event.shiftKey) {
                             var selectedText = getSelectedText();
                             if (selectedText === "" && event.button == 0) {
-                                if (!event.ctrlKey) {
-                                    rows[index].mark("Replace");
-                                    lastMarkedIndex = index;
-                                } else {
-                                    if (event.ctrlKey) {
-                                        rows[index].mark("Toggle");
-                                        lastMarkedIndex = index;
-                                    }
-                                }
+                                rows[index].mark(operation);
+                                lastMarkedIndex = index;
                             }
                         } else {
-                            if (!event.ctrlKey) {
-                                var markList = [];
-                                if (lastMarkedIndex < index) {
-                                    for (var i = lastMarkedIndex; i <= index; i++) {
-                                        markList.push(rows[i]);
-                                    }
-                                    dataView.mark(markList, "Replace");
-                                }
-                                if (lastMarkedIndex > index) {
-                                    for (var i = index; i <= lastMarkedIndex; i++) {
-                                        markList.push(rows[i]);
-                                    }
-                                    dataView.mark(markList, "Replace");
+                            if (lastMarkedIndex < index) {
+                                for (var i = lastMarkedIndex; i <= index; i++) {
+                                    rows[i].mark(operation);
                                 }
                             }
-                            if (event.ctrlKey) {
-                                var markList = [];
-                                for (i = 0; i < rows.length; i++) {
-                                    if (rows[i].isMarked()) {
-                                        markList.push(rows[i]);
-                                    }
-                                }
-                                if (lastMarkedIndex < index) {
-                                    for (var i = lastMarkedIndex; i <= index; i++) {
-                                        markList.push(rows[i]);
-                                    }
-                                    dataView.mark(markList, "Replace");
-                                }
-                                if (lastMarkedIndex > index) {
-                                    for (var i = index; i <= lastMarkedIndex; i++) {
-                                        markList.push(rows[i]);
-                                    }
-                                    dataView.mark(markList, "Replace");
+                            if (lastMarkedIndex > index) {
+                                for (var i = index; i <= lastMarkedIndex; i++) {
+                                    rows[i].mark(operation);
                                 }
                             }
                         }
@@ -190,7 +174,7 @@ function renderTextCards(
                 event.stopPropagation();
             };
             // create mouse over functionallity & Border around card and tooltip
-            configureMouseOver(divObject, borderDiv, fontStyling, rows[index], tooltipEnabled, mod, annotationEnabled);
+            configureMouseOver(divObject, borderDiv, fontStyling, rows[index], mod, hierarchy);
 
             borderDiv.appendChild(newDiv);
             fragment.appendChild(borderDiv);

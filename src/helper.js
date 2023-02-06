@@ -1,7 +1,8 @@
+// @ts-check
 /**
  * Truncates string
- * @param {*} dataValue the actual string
- * @param {*} maxLength max length of string
+ * @param {string} dataValue the actual string
+ * @param {number} maxLength max length of string
  */
 function truncateString(dataValue, maxLength) {
     // Slice at maxLength minus 3 to really return maxLength characters
@@ -10,15 +11,14 @@ function truncateString(dataValue, maxLength) {
 
 /**
  * Configures mouse over
- * @param {*} divObject
- * @param {*} borderDiv
- * @param {*} fontStyling
- * @param {*} row
- * @param {*} tooltipEnabled
- * @param {*} mod
- * @param {*} annotationEnabled
+ * @param {CardDiv} divObject
+ * @param {HTMLDivElement} borderDiv
+ * @param {StylingInfo} fontStyling
+ * @param {Spotfire.DataViewRow} row
+ * @param {Spotfire.Mod} mod
+ * @param {{tooltip: Spotfire.DataViewHierarchy, annotation: Spotfire.DataViewHierarchy  }} hierarchy
  */
-function configureMouseOver(divObject, borderDiv, fontStyling, row, tooltipEnabled, mod, annotationEnabled) {
+function configureMouseOver(divObject, borderDiv, fontStyling, row, mod, hierarchy) {
     // mouse over text card event listener
     divObject.textCardDiv.onmouseenter = (e) => {
         borderDiv.style.boxShadow = "0 0 0 1px " + fontStyling.fontColor;
@@ -34,21 +34,21 @@ function configureMouseOver(divObject, borderDiv, fontStyling, row, tooltipEnabl
     };
 
     // mouse over text card content event listener
-    divObject.content.onmouseenter = (e) => {
-        if (tooltipEnabled) {
-            var tooltipString = createTooltipString(row, "Tooltip");
+    if (!hierarchy.tooltip.isEmpty) {
+        divObject.content.onmouseenter = (e) => {
+            var tooltipString = createTooltipString(row, hierarchy.tooltip);
             mod.controls.tooltip.show(tooltipString);
-        }
-    };
+        };
 
-    divObject.content.onmouseleave = (e) => {
-        if (tooltipEnabled) mod.controls.tooltip.hide();
-    };
+        divObject.content.onmouseleave = (e) => {
+            mod.controls.tooltip.hide();
+        };
+    }
 
     // mouse over for annotation event listener
-    if (annotationEnabled) {
+    if (!hierarchy.annotation.isEmpty) {
         divObject.header.onmouseenter = (e) => {
-            var tooltipString = createTooltipString(row, "Annotation");
+            var tooltipString = createTooltipString(row, hierarchy.annotation);
             mod.controls.tooltip.show(tooltipString);
         };
 
@@ -60,7 +60,7 @@ function configureMouseOver(divObject, borderDiv, fontStyling, row, tooltipEnabl
 
 /**
  * Check if all rows are marked
- * @param {*} rows
+ * @param {Spotfire.DataViewRow[]} rows
  */
 function isAllRowsMarked(rows) {
     for (var i = 0; i < rows.length; i++) {
@@ -71,45 +71,37 @@ function isAllRowsMarked(rows) {
 
 /**
  * Sort rows
- * @param {*} rows
- */
-function sortRows(rows, sortOrder) {
-    let length = rows[0].categorical("Sorting").value().length;
-    rows.sort(function (a, b) {
-        let sortValueA = a.categorical("Sorting").value()[0].key;
-        let sortValueB = b.categorical("Sorting").value()[0].key;
-
-        for (let i = 1; i < length; i++) {
-            if (sortValueA == sortValueB) {
-                sortValueA = a.categorical("Sorting").value()[i].key;
-                sortValueB = b.categorical("Sorting").value()[i].key;
-            } else {
-                i = length;
-            }
+ * @param {Spotfire.DataViewRow[]} rows
+ * @param {string} sortOrder
+ * @param {boolean} categoricalSorting
+*/
+function sortRows(rows, sortOrder, categoricalSorting) {
+    let order = sortOrder == "asc" ? 1 : -1;
+    rows.sort(function (row1, row2) {
+        if (categoricalSorting) {
+            // Categorical sorting should respect the sort order defined by Spotfire
+            return order * (row1.categorical("Sorting").leafIndex - row2.categorical("Sorting").leafIndex);
         }
 
-        if (!isNaN(Number(sortValueA)) && !isNaN(Number(sortValueB))) {
-            sortValueA = Number(sortValueA);
-            sortValueB = Number(sortValueB);
+        // Handle continuous sorting for all supported data types.s
+        let v1 = row1.continuous("Sorting").value();
+        let v2 = row2.continuous("Sorting").value();
 
-            if (sortValueA < sortValueB) return sortOrder == "asc" ? -1 : 1;
-
-            if (sortValueA > sortValueB) return sortOrder == "asc" ? 1 : -1;
-
-            return 0;
-        } else {
-            if (sortValueA == null) sortValueA = "";
-            if (sortValueB == null) sortValueB = "";
-
-            if (sortOrder == "asc") return sortValueA.localeCompare(sortValueB);
-            else return sortValueB.localeCompare(sortValueA);
+        if (v1 instanceof Date && v2 instanceof Date) {
+            return order * (v1.getTime() - v2.getTime());
+        } else if (typeof v1 == "number" && typeof v2 == "number") {
+            return order * (v1 - v2);
+        } else if (typeof v1 == "string" && typeof v2 == "string") {
+            return order * v1.localeCompare(v2);
         }
+
+        return 0;
     });
 }
 
 /**
  * Get text from text card to clipboard
- * @param text Text is the value that the user has chosen, either through selection or copy entire text card
+ * @param {string} text Text is the value that the user has chosen, either through selection or copy entire text card
  */
 function textToClipboard(text) {
     var temporaryCopyElement = document.createElement("textarea");
@@ -122,7 +114,7 @@ function textToClipboard(text) {
 
 /**
  * Find element in dom
- * @param selector Selector as string to search for in dom
+ * @param {string} selector Selector as string to search for in dom
  * @returns {HTMLElement}
  */
 function findElem(selector) {
@@ -131,8 +123,7 @@ function findElem(selector) {
 
 /**
  * Get selected text
- * @param selector Selector as string to search for in dom
- * @returns {String}
+ * @returns {string}
  */
 function getSelectedText() {
     var selectedText = "";
@@ -146,48 +137,4 @@ function getSelectedText() {
         selectedText = document.getSelection().toString();
     }
     return selectedText;
-}
-
-/**
- * Get name of column from data table
- * @param element The row that will be used to get the specific column name
- * @param {*} string String that represent the axis where the column name will come from
- * @param {*} index Index of the column within the chosen axis to get the column name from
- */
-function getColumnName(element, string, index) {
-    var result = null;
-    try {
-        result = element.categorical(string).value()[0]._node.__hierarchy.levels[index].name;
-    } catch (error) {
-        console.log(error.message);
-    }
-
-    if (result != null) {
-        result = result.toString();
-    } else {
-        return result;
-    }
-    return result;
-}
-
-/**
- * Get data value from row
- * @param  element The row that will be used to get the specific value
- * @param {*} string String that represent the axis where the value will come from
- * @param {*} index Index of the column within the chosen axis to get the value from
- */
-function getDataValue(element, string, index) {
-    var result = null;
-    try {
-        result = element.categorical(string).value()[index].key;
-    } catch (error) {
-        console.log(error.message);
-    }
-
-    if (result != null) {
-        result = result.toString();
-    } else {
-        return result;
-    }
-    return result;
 }
