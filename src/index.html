@@ -18,6 +18,10 @@
 
     <body>
         <div id="warning-message"></div>
+        <div id="configDialogContents">
+            <label for="keywords2highlight">Keywords to highlight</label>: <br/><input id="keywords2highlight">
+            <br/><input type="checkbox" id="isHtmlAllowed" title="allows the text card to render HTML"> <label for="isHtmlAllowed">Allow HTML</label>
+        </div>
         <div id="text-card-container">
             <div id="text-card"></div>
         </div>
@@ -54,5 +58,6 @@
         <script src="renderer.js"></script>
         <script src="creator.js"></script>
         <script src="helper.js"></script>
+        <script src="config.js"></script>
     </body>
 </html>

@@ -197,9 +197,14 @@ Spotfire.initialize(async (mod) => {
         });
 
         //Create SortButton
-        if (sortingEnabled) createSortButton(modDiv, mod.getRenderContext().styling.general.font.color, sortOrder);
+        if (sortingEnabled) createSortButton(modDiv, context.styling.general.font.color, sortOrder);
+
+        //create config button
+        let configContents = document.getElementById("configDialogContents")
+        if(context.isEditing) createConfigButton(context,configContents)
 
         // signal that the mod is ready for export.
         context.signalRenderComplete();
     }
 });
+  
