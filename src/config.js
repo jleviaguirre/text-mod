@@ -120,7 +120,6 @@ function createConfigButton(context, configDialogContents, keywords) {
     //this part configures the input text for highlighting so when you press enter, it performs the action
     let keywordsInput = document.getElementById("keywords2highlight");
     function performSearch() {
-        console.log("searching for",keywordsInput.value)
         keywords.set(keywordsInput.value);
     }
 
