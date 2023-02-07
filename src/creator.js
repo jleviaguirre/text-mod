@@ -11,7 +11,7 @@
         header: HTMLDivElement,
         content: HTMLDivElement}}
  */
-function createTextCard(content, annotation, maxHeight, markObject, fontStyling, lineDividerColor) {
+function createTextCard(content, annotation, maxHeight, markObject, fontStyling, lineDividerColor,keywords2highlight) {
     // create div
     var textCardDiv = createTextCardDiv(fontStyling);
 
@@ -62,7 +62,7 @@ function createTextCard(content, annotation, maxHeight, markObject, fontStyling,
 
     // add paragraph to text card
     if (typeof content === "string") {
-        var contentParagraph = createTextCardContentParagraph(maxHeight, content, fontStyling);
+        var contentParagraph = createTextCardContentParagraph(maxHeight, content, fontStyling,keywords2highlight);
         textCardDiv.appendChild(contentParagraph);
     }
 
@@ -117,10 +117,10 @@ function createTooltipString(specificRow, tooltipHierarchy) {
  * @param {StylingInfo} fontStyling Style of font from api
  * @returns {HTMLDivElement}
  */
-function createTextCardContentParagraph(maxHeight, content, fontStyling) {
+function createTextCardContentParagraph(maxHeight, content, fontStyling,keywords2highlight) {
     var paragraph = document.createElement("div");
     paragraph.setAttribute("id", "text-card-paragraph");
-    paragraph.innerHTML = content;
+    paragraph.innerHTML = highlightWords(content,keywords2highlight);
     paragraph.style.maxHeight = maxHeight + "px";
 
     // apply styling of font Weight and Style only on Textcard Content (not on annotation line)
@@ -130,6 +130,13 @@ function createTextCardContentParagraph(maxHeight, content, fontStyling) {
 
     return paragraph;
 }
+
+//returns 
+function highlightWords(text, find) {
+    let keywords = find.split(',').map(s => s.trim());
+    let regex = new RegExp(keywords.join('|'), "gi");
+    return text.replace(regex, match => `<mark>${match}</mark>`);
+  }
 
 /**
  * Create header of text card / annotation
