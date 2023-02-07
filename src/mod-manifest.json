@@ -11,6 +11,11 @@
             "defaultValue": "asc"
         },
         {
+            "name": "keywords",
+            "type": "string",
+            "defaultValue": ""
+        },
+        {
             "name": "useCustomCardBy",
             "type": "boolean",
             "defaultValue": false

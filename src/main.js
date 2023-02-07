@@ -24,7 +24,8 @@ Spotfire.initialize(async (mod) => {
         mod.visualization.axis("Card by"),
         mod.property("useCustomCardBy"),
         mod.visualization.axis("Tooltip"),
-        mod.visualization.axis("Annotation")
+        mod.visualization.axis("Annotation"),
+        mod.property("keywords"),
     );
 
     const modDiv = findElem("#text-card-container");
@@ -42,12 +43,13 @@ Spotfire.initialize(async (mod) => {
      * @param {Spotfire.Axis} sortAxis
      * @param {Spotfire.ModProperty<string>} sortOrder
      * @param {Spotfire.Axis} cardByAxis
-     * @param {Spotfire.ModProperty<string>} sortOrder
+     * @param {Spotfire.ModProperty<string>} useCustomCardBy
      * @param {Spotfire.Axis} tooltipAxis
      * @param {Spotfire.Axis} annotationAxis
+     * @param {String} keywords
      */
     // @ts-ignore
-    async function render(dataView, windowSize, contentAxis, sortAxis, sortOrder, cardByAxis, useCustomCardBy, tooltipAxis, annotationAxis) {
+    async function render(dataView, windowSize, contentAxis, sortAxis, sortOrder, cardByAxis, useCustomCardBy, tooltipAxis, annotationAxis, keywords) {
         // Check card by axis expression.
         if (cardByAxis.expression !== "<baserowid()>" && !useCustomCardBy.value()) {
             createWarning(modDiv, context.styling.general.font.color, cardByAxis, useCustomCardBy);
@@ -129,6 +131,7 @@ Spotfire.initialize(async (mod) => {
         } 
 
         var rerender = true;
+        let keywords2highlight = keywords.value();
 
         var returnedObject = renderTextCards(
             rows,
@@ -137,7 +140,8 @@ Spotfire.initialize(async (mod) => {
             rerender,
             windowSize,
             mod,
-            hierarchy
+            hierarchy,
+            keywords2highlight
         );
         // @ts-ignore
         modDiv.appendChild(returnedObject.fragment);
@@ -201,7 +205,9 @@ Spotfire.initialize(async (mod) => {
 
         //create config button
         let configContents = document.getElementById("configDialogContents")
-        if(context.isEditing) createConfigButton(context,configContents)
+        createConfigButton(context,configContents,keywords) //search for keywords button
+
+
 
         // signal that the mod is ready for export.
         context.signalRenderComplete();

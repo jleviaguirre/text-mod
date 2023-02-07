@@ -24,9 +24,10 @@
  * @param {Spotfire.Size} windowSize WindowSize of the mod in pixels
  * @param {Spotfire.Mod} mod The mod object that will be used to add a tooltip using the "controls"
  * @param {{tooltip: Spotfire.DataViewHierarchy, annotation: Spotfire.DataViewHierarchy  }} hierarchy
+ * @param {Spotfire.ModProperty<string>} keywords2highlight
  * @returns {{fragment: DocumentFragment, startIndex: number}}
  */
-function renderTextCards(rows, prevIndex, cardsToLoad, rerender, windowSize, mod, hierarchy) {
+function renderTextCards(rows, prevIndex, cardsToLoad, rerender, windowSize, mod, hierarchy, keywords2highlight) {
     if (rerender) {
         document.querySelector("#text-card-container").innerHTML = "";
     }
@@ -121,7 +122,8 @@ function renderTextCards(rows, prevIndex, cardsToLoad, rerender, windowSize, mod
                 cardMaxHeight,
                 markObject,
                 fontStyling,
-                scalesStyling.tickMarkColor
+                scalesStyling.tickMarkColor,
+                keywords2highlight
             );
             let newDiv = divObject.textCardDiv;
             newDiv.setAttribute("id", "text-card");
