@@ -120,7 +120,7 @@ function createConfigButton(context, configDialogContents, keywords) {
     //this part configures the input text for highlighting so when you press enter, it performs the action
     let keywordsInput = document.getElementById("keywords2highlight");
     function performSearch() {
-        console.log("perform search:", keywordsInput.value);
+        console.log("searching for",keywordsInput.value)
         keywords.set(keywordsInput.value);
     }
 
@@ -134,6 +134,17 @@ function createConfigButton(context, configDialogContents, keywords) {
     document.getElementById("performSearchButton").onclick = () => {
         performSearch()
     }
+
+    //add click to not only show the config dialog button, but highlight the keyword input field
+    document.getElementById("configButton").onmouseup = ()=>{
+        setTimeout(()=>{document.getElementById("keywords2highlight").focus()},50);
+    }
+
+    //perform search when clearing the button
+    document.querySelector("#searchForm button[type='reset']").onclick = () => {
+        keywordsInput.value="";
+        performSearch();
+    }
 }
 
-
+ 
