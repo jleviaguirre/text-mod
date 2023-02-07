@@ -79,5 +79,6 @@
         "creator.js",
         "helper.js",
         "renderer.js"
+        "config.js"
     ]
 }
