@@ -11,7 +11,8 @@
         header: HTMLDivElement,
         content: HTMLDivElement}}
  */
-function createTextCard(content, annotation, maxHeight, markObject, fontStyling, lineDividerColor,keywords2highlight) {
+
+        function createTextCard(content, annotation, maxHeight, markObject, fontStyling, lineDividerColor,keywords2highlight) {
     // create div
     var textCardDiv = createTextCardDiv(fontStyling);
 
@@ -131,8 +132,9 @@ function createTextCardContentParagraph(maxHeight, content, fontStyling,keywords
     return paragraph;
 }
 
-//returns 
+//wraps with a mark those letters found on text. highlightWords("abcde fgh ibjkl","b,e") //'a<mark>b</mark>cd<mark>e</mark> fgh i<mark>b</mark>jkl'
 function highlightWords(text, find) {
+    if (!find) return text;
     let keywords = find.split(',').map(s => s.trim());
     let regex = new RegExp(keywords.join('|'), "gi");
     return text.replace(regex, match => `<mark>${match}</mark>`);
